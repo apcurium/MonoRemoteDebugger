@@ -13,13 +13,39 @@ namespace MonoRemoteDebugger.SharedLib.Server
         public const int TcpPort = 13001;
         private static readonly Logger logger = LogManager.GetCurrentClassLogger();
         private readonly CancellationTokenSource cts = new CancellationTokenSource();
+        private bool disposed = false;
+        private bool _runOnce = false;
 
         private Task listeningTask;
         private TcpListener tcp;
 
+        public MonoDebugServer(bool runOnce)
+        {
+            _runOnce = runOnce;
+        }
+
         public void Dispose()
         {
-            Stop();
+            Dispose(true);
+            GC.SuppressFinalize(this);
+        }
+
+        ~MonoDebugServer()
+        {
+            Dispose(false);
+        }
+
+        protected void Dispose(bool disposing)
+        {
+            if (!disposed)
+            {
+                if (disposing)
+                {
+                    Stop();
+                }
+
+                disposed = true;
+            }
         }
 
         public void Start()
@@ -31,7 +57,7 @@ namespace MonoRemoteDebugger.SharedLib.Server
 
         private void StartListening(CancellationToken token)
         {
-            while (true)
+            while (!cts.IsCancellationRequested)
             {
                 logger.Info("Waiting for client");
                 TcpClient client = tcp.AcceptTcpClient();
@@ -41,6 +67,10 @@ namespace MonoRemoteDebugger.SharedLib.Server
                 var clientSession = new ClientSession(client.Client);
 
                 Task.Factory.StartNew(clientSession.HandleSession, token).Wait();
+                if(_runOnce)
+                {
+                    cts.Cancel();
+                }
             }
         }
 
@@ -52,8 +82,7 @@ namespace MonoRemoteDebugger.SharedLib.Server
                 tcp.Server.Close(0);
                 tcp = null;
             }
-            if (listeningTask != null)
-                Task.WaitAll(listeningTask);
+
             logger.Info("Closed MonoDebugServer");
         }
 
@@ -91,7 +120,19 @@ namespace MonoRemoteDebugger.SharedLib.Server
 
         public void WaitForExit()
         {
-            listeningTask.Wait();
+            try
+            {
+                listeningTask.Wait(cts.Token);
+            }
+            catch (OperationCanceledException)
+            {
+                logger.Info("Listening task cancelled");
+                // do nothing here
+            }
+            catch (Exception ex)
+            {
+                logger.Trace(ex);
+            }
         }
     }
 }

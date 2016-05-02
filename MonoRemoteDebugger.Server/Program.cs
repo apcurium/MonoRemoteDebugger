@@ -1,4 +1,5 @@
-﻿using MonoRemoteDebugger.SharedLib;
+﻿using System;
+using MonoRemoteDebugger.SharedLib;
 using MonoRemoteDebugger.SharedLib.Server;
 
 namespace MonoRemoteDebugger.Server
@@ -7,13 +8,21 @@ namespace MonoRemoteDebugger.Server
     {
         private static void Main(string[] args)
         {
-            MonoLogger.Setup();
+            bool runOnce = false;
+            if (args.Length != 0 && args[0] == "runOnce")
+                runOnce = true;
 
-            using (var server = new MonoDebugServer())
+            using (var server = new MonoDebugServer(runOnce))
             {
+                Console.CancelKeyPress += delegate
+                {
+                    server.Stop();
+                };
+
+                MonoLogger.Setup();
+
                 server.StartAnnouncing();
                 server.Start();
-
                 server.WaitForExit();
             }
         }

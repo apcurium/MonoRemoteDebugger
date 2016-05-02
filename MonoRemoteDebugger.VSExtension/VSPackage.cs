@@ -32,7 +32,7 @@ namespace MonoRemoteDebugger.VSExtension
     {
         private static readonly Logger logger = LogManager.GetCurrentClassLogger();
         private MonoVisualStudioExtension monoExtension;
-        private MonoDebugServer server = new MonoDebugServer();
+        private MonoDebugServer server = new MonoDebugServer(false);
 
         protected override void Initialize()
         {
@@ -161,7 +161,7 @@ namespace MonoRemoteDebugger.VSExtension
 
                 monoExtension.BuildSolution();
 
-                using (server = new MonoDebugServer())
+                using (server = new MonoDebugServer(false))
                 {
                     server.Start();
                     await monoExtension.AttachDebugger(MonoProcess.GetLocalIp().ToString());
